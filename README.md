@@ -4,11 +4,11 @@
 
 # 🛰️🔍 PY-NET-RECON 🔍🛰️
 
-### ⚡ Attack Surface Scanner · Network Reconnaissance in Pure Python ⚡
+### ⚡ v2.3 Ultimate Enterprise Threat Intelligence & Forensic Recon Engine ⚡
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/Dependencies-0-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.2-blue)
+![Version](https://img.shields.io/badge/Version-2.3-blue)
 ![Use](https://img.shields.io/badge/Use-Ethical%20Hacking-red)
 ![Languages](https://img.shields.io/badge/Docs-EN%20%7C%20ES%20%7C%20FR%20%7C%20中文-orange)
 
@@ -49,10 +49,12 @@ Every authorized intrusion starts with **Reconnaissance & Enumeration**. Before 
 
 | ❓ Question | 🛠️ How py-net-recon answers it |
 |---|---|
-| Who is the target and what is its IP? | DNS resolution of the hostname |
+| Who is the target and what is its IP? | Forward DNS plus reverse DNS (PTR) |
 | Which doors are open? | TCP *connect* scan |
-| What software is behind them? | Banner grabbing |
-| How do I keep evidence? | Timestamped `.txt` report |
+| How responsive is each open port? | Socket connection RTT in milliseconds |
+| What web defenses are visible? | HTTP security-header inspection |
+| How should findings be prioritized? | Estimated CVSS score and risk tier |
+| How do I keep evidence? | Structured forensic `.txt` report |
 
 > 💡 **Attack surface** = every exposed entry point. What you can't see, you can't defend (or audit).
 
@@ -62,12 +64,12 @@ Every authorized intrusion starts with **Reconnaissance & Enumeration**. Before 
 
 ### 1️⃣ 🔌 TCP scanning with sockets and clean connection closing
 Uses `socket` with `AF_INET` + `SOCK_STREAM` (TCP/IPv4) and `connect_ex()`, which **returns an error code instead of raising an exception**: `0` means the **port is open**.
-- ⏱️ **1.0 s** timeout per port, so filtered ports never block the scan.
+- ⏱️ **1.2 s** connection timeout per port, so filtered ports do not stall the scan indefinitely.
 - 🧹 `with socket.socket(...)` closes the connection **even if an error occurs**, preventing descriptor leaks.
 
 ### 2️⃣ ⚡ Massive multithreading with `ThreadPoolExecutor`
 Port scanning is **I/O-bound**: the program mostly *waits* for the network. A thread pool waits on dozens of connections **at the same time**.
-- 🧵 Configurable concurrency (`-w`, default 50).
+- 🧵 Configurable concurrency (`-w`, default 100).
 - 📈 Scanning ports 1-1024 drops from minutes (sequential) to seconds.
 - 🔒 The `with ThreadPoolExecutor` block guarantees every thread finishes and is released.
 
@@ -77,7 +79,7 @@ When a port is open, a new connection is made and the service's first reply is r
 | Port | Typical service | Technique |
 |:---:|---|---|
 | **22** | SSH | Server announces itself: `SSH-2.0-OpenSSH_8.9...` |
-| **80 / 8080** | HTTP | Sends `HEAD / HTTP/1.1` + `Host`, reads the status line |
+| **80 / 8080** | HTTP | Sends `GET / HTTP/1.1` + `Host` for web inspection |
 | **21 / others** | FTP, etc. | Reads the greeting message |
 
 Only the **first line** is kept, decoded with `errors='ignore'`. No reply → `Sin banner visible` (no visible banner).
@@ -97,9 +99,26 @@ Automatic help (`-h`), required arguments and typed values (`-w` is an integer).
 Invalid input never crashes the tool: it warns and falls back to `80, 443`.
 
 ### 6️⃣ 🗂️ Automatic forensic `.txt` reports with timestamps
-Each run writes `reporte_<target>.txt` (dots replaced by `_`) containing the target, resolved IP, **exact date/time**, ports and threads used, one line per open port, and total duration.
+Each run writes `reporte_forense_<target>.txt` (dots replaced by `_`) with the target, resolved IP, **exact analysis timestamp**, selected ports, worker count, total duration, open-port inventory, and per-port findings. The report is structured for review and is overwritten when the same target is scanned again.
 
-> ⚠️ The report is **overwritten** on re-scan of the same target; rename it to keep historical evidence.
+### 7️⃣ 🔁 Reverse DNS (PTR) resolution
+After resolving a hostname to IPv4, the scanner performs a reverse lookup with `gethostbyaddr()` and displays the associated PTR hostname in the console and report. If no PTR record is available, the report records that explicitly; reverse DNS is an observation, not proof of asset ownership.
+
+### 8️⃣ ⏱️ Per-port socket response time (RTT)
+The scanner measures elapsed time around each TCP `connect_ex()` attempt and expresses it in milliseconds. RTT is displayed and retained in the report for **open ports**; closed or unreachable attempts are not included in the findings inventory. This is connection-establishment timing, not a continuous latency test.
+
+### 9️⃣ 🛡️ Web security-header inspection
+For selected web ports (`80`, `443`, `8080`, `8443`, `3000`, `5000`), the scanner requests the root page and inspects `Strict-Transport-Security` (HSTS), `X-Frame-Options`, `Content-Security-Policy`, and `X-Powered-By`; it also records the `Server` banner. Missing or undisclosed headers are shown as such, not treated as proof of a vulnerability.
+
+> ⚠️ Inspection sends plain HTTP and does not negotiate TLS. HTTPS-only services may therefore return incomplete or unavailable header data; verify them with a TLS-capable web assessment.
+
+### 🔟 📊 Risk matrix and estimated CVSS
+Known ports are mapped to a service profile, one of four severity categories (low, medium, high, or critical; displayed by the CLI as `BAJO`, `MEDIO`, `ALTO`, or `CRÍTICO`), and a numeric **estimated CVSS base score**. Unmapped ports are marked `INFORMATIVO` with a score of `0.0`.
+
+> ℹ️ These are heuristic port-level estimates, not CVSS assessments of confirmed vulnerabilities, CVE matches, or exploitability. Validate each finding in context before making a risk decision.
+
+### 1️⃣1️⃣ 🧾 Industrial forensic reporting and hardening guidance
+The generated report includes an analysis summary, target and PTR identity, scan scope and timing, open-port/service inventory, RTT and risk metrics, available web-header observations, and a remediation/hardening section. Recommendations cover insecure protocols, web security headers, and network segmentation for sensitive services.
 
 <a id="en-requirements"></a>
 
@@ -122,7 +141,7 @@ Each run writes `reporte_<target>.txt` (dots replaced by `_`) containing the tar
 python --version        # on Linux/macOS: python3 --version
 
 # 2️⃣ Clone the repository
-git clone https://github.com/<YOUR-USER>/py-net-recon.git
+git clone https://github.com/francisc0-PE/py-net-recon.git
 cd py-net-recon
 
 # 3️⃣ Verify it works
@@ -138,8 +157,8 @@ python scanner.py --help
 | Flag | Long | Required | Description | Default |
 |:---:|---|:---:|---|---|
 | `-t` | `--target` | ✅ | Target IP or domain | — |
-| `-p` | `--ports` | ❌ | Range (`1-1024`) or list (`80,443`) | `21,22,80,443,445,8080` |
-| `-w` | `--workers` | ❌ | Simultaneous threads | `50` |
+| `-p` | `--ports` | ❌ | Range (`1-1024`) or list (`80,443`) | `21,22,80,443,445,3306,8080` |
+| `-w` | `--workers` | ❌ | Simultaneous threads | `100` |
 | `-h` | `--help` | ❌ | Show help | — |
 
 ```bash
@@ -162,14 +181,14 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
 📺 **Sample output** (illustrative):
 
 ```text
-=== PY-NET-RECON v1.2 | Dynamic Motor ===
+=== PY-NET-RECON v2.3 | Ultimate Threat Intelligence & Forensic Recon Engine ===
 
-[*] Iniciando escaneo en scanme.nmap.org (45.33.32.156) | Puertos a evaluar: 1024 | Hilos: 50
-[+] Puerto 22 ABIERTO | Servicio: SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13
-[+] Puerto 80 ABIERTO | Servicio: HTTP/1.1 200 OK
+[*] Objetivo: scanme.nmap.org | IP: 45.33.32.156 | PTR: scanme.nmap.org
+[*] Iniciando motor multihilo con 7 puertos y 100 workers...
+[+] Puerto    22 ABIERTO | RTT: 12.34ms | Servicio: SSH (Secure Shell) | CVSS: 5.3 | Riesgo: [MEDIO]
 
-[*] Escaneo finalizado en 6.42 segundos.
-[+] Reporte guardado exitosamente en: reporte_scanme_nmap_org.txt
+[*] Auditoría integral finalizada en 0.42 segundos.
+[+] Reporte Forense Enterprise generado con éxito: reporte_forense_scanme_nmap_org.txt
 ```
 
 > 🧪 Practice legally with `scanme.nmap.org` (allowed by the Nmap project, moderate use) or your own lab.
@@ -185,26 +204,27 @@ Everything lives in [scanner.py](scanner.py), split into **small single-purpose 
  CLI (argparse)
      │   -t target   -p ports   -w threads
      ▼
- gethostbyname()  ──► target IP
+ gethostbyname()  ──► target IPv4 ──► gethostbyaddr() ──► PTR
      ▼
  parse_ports()    ──► [21, 22, 80, ...]
      ▼
  ThreadPoolExecutor (N threads)
      ├─► scan_port(ip, 21)  ┐
-     ├─► scan_port(ip, 22)  ├─ connect_ex == 0 ? ─► get_banner() ─► "[+] Port ..."
-     └─► scan_port(ip, ...) ┘                                       (or None if closed)
+     ├─► scan_port(ip, 80)  ├─ connect_ex + RTT ─► risk profile / web inspection
+     └─► scan_port(ip, ...) ┘
      ▼
  future.result() ──► list of open-port results
      ▼
- Report reporte_<target>.txt
+ reporte_forense_<target>.txt ──► inventory + risk + remediation
 ```
 
 | Function | Role | Technical detail |
 |---|---|---|
 | `parse_ports()` | 🎛️ Port engine | Text → `list[int]`; safe fallback to 80, 443 |
-| `get_banner()` | 🏷️ Fingerprinting | New connection, `HEAD` for HTTP, `recv(1024)`, first line |
-| `scan_port()` | 🔌 Unit of work | `connect_ex`; prints and returns only if open |
-| `main()` | 🎼 Orchestrator | CLI, DNS, thread pool, timing and report |
+| `get_risk_profile()` | 📊 Risk mapping | Known-port service, tier and estimated CVSS profile |
+| `deep_http_inspection()` | 🛡️ Web inspection | Reads selected HTTP response headers and server metadata |
+| `scan_port()` | 🔌 Unit of work | TCP connect, RTT measurement, banner/risk and optional web inspection |
+| `main()` | 🎼 Orchestrator | CLI, forward/reverse DNS, thread pool, output and forensic report |
 
 ### 🧵 How do the threads flow?
 1. `main()` creates the pool with `max_workers = -w`.
@@ -217,7 +237,7 @@ Everything lives in [scanner.py](scanner.py), split into **small single-purpose 
 TCP sockets and the implicit three-way handshake in `connect_ex`; concurrency for I/O-bound work; safe resource handling with context managers; CLI design with `argparse` and tolerance to bad input.
 
 ### 🔭 Known limitations & roadmap
-TCP/IPv4 only · full *connect* scan (visible in logs, no SYN scan) · no TLS banner grabbing (e.g. port 443) · future ideas: JSON/CSV output, configurable report name, CLI timeouts, progress bar, TLS support.
+TCP/IPv4 *connect* scan only · RTT is reported for open ports · CVSS values are heuristic port profiles, not vulnerability verification · web inspection uses plain HTTP without TLS negotiation · reports are plain text and overwritten for a repeated target · no authenticated testing, exploit validation, or CVE correlation.
 
 <a id="en-disclaimer"></a>
 
@@ -273,10 +293,12 @@ Toda intrusión autorizada comienza con **Reconocimiento y Enumeración**. Antes
 
 | ❓ Pregunta | 🛠️ Cómo la responde py-net-recon |
 |---|---|
-| ¿Quién es el objetivo y cuál es su IP? | Resolución DNS del dominio |
+| ¿Quién es el objetivo y cuál es su IP? | DNS directo e inverso (PTR) |
 | ¿Qué puertas están abiertas? | Escaneo TCP *connect* |
-| ¿Qué software hay detrás? | *Banner grabbing* |
-| ¿Cómo dejo evidencia? | Reporte `.txt` con fecha y hora |
+| ¿Qué capacidad de respuesta tiene cada puerto abierto? | RTT de conexión TCP en milisegundos |
+| ¿Qué defensas web están visibles? | Inspección de cabeceras HTTP |
+| ¿Cómo priorizo los hallazgos? | CVSS estimado y nivel de riesgo |
+| ¿Cómo conservo la evidencia? | Reporte forense `.txt` estructurado |
 
 > 💡 **Superficie de ataque** = todos los puntos de entrada expuestos. Lo que no conoces, no lo puedes defender (ni auditar).
 
@@ -286,12 +308,12 @@ Toda intrusión autorizada comienza con **Reconocimiento y Enumeración**. Antes
 
 ### 1️⃣ 🔌 Escaneo TCP con Sockets y cierre de conexiones
 Usa `socket` con `AF_INET` + `SOCK_STREAM` (TCP/IPv4) y `connect_ex()`, que **devuelve un código de error en vez de lanzar excepción**: `0` significa **puerto abierto**.
-- ⏱️ *Timeout* de **1.0 s** por puerto: los puertos filtrados no bloquean el escaneo.
+- ⏱️ *Timeout* de conexión de **1.2 s** por puerto: los puertos filtrados no bloquean indefinidamente el escaneo.
 - 🧹 `with socket.socket(...)` **cierra siempre la conexión**, incluso ante errores, evitando fugas de descriptores.
 
 ### 2️⃣ ⚡ Multithreading masivo con `ThreadPoolExecutor`
 Escanear puertos es una tarea **limitada por E/S (I/O-bound)**: el programa pasa casi todo el tiempo *esperando* a la red. Un *pool* de hilos espera decenas de conexiones **a la vez**.
-- 🧵 Concurrencia configurable (`-w`, por defecto 50).
+- 🧵 Concurrencia configurable (`-w`, por defecto 100).
 - 📈 Escanear 1-1024 pasa de minutos (secuencial) a segundos.
 - 🔒 El bloque `with ThreadPoolExecutor` garantiza que todos los hilos terminen y se liberen.
 
@@ -301,7 +323,7 @@ Con un puerto abierto, se abre una nueva conexión y se lee la primera respuesta
 | Puerto | Servicio típico | Técnica |
 |:---:|---|---|
 | **22** | SSH | El servidor se anuncia: `SSH-2.0-OpenSSH_8.9...` |
-| **80 / 8080** | HTTP | Envía `HEAD / HTTP/1.1` + `Host` y lee la línea de estado |
+| **80 / 8080** | HTTP | Envía `GET / HTTP/1.1` + `Host` para inspeccionar el servicio web |
 | **21 / otros** | FTP, etc. | Lee el mensaje de bienvenida |
 
 Solo se conserva la **primera línea**, decodificada con `errors='ignore'`. Sin respuesta → `Sin banner visible`.
@@ -321,9 +343,26 @@ Ayuda automática (`-h`), argumentos obligatorios y tipos validados (`-w` es ent
 Una entrada inválida no rompe la herramienta: avisa y usa `80, 443`.
 
 ### 6️⃣ 🗂️ Reportes forenses `.txt` con marcas de tiempo
-Cada ejecución genera `reporte_<objetivo>.txt` (puntos reemplazados por `_`) con objetivo, IP resuelta, **fecha/hora exacta**, puertos e hilos usados, una línea por puerto abierto y la duración total.
+Cada ejecución genera `reporte_forense_<objetivo>.txt` (puntos reemplazados por `_`) con objetivo, IP resuelta, **fecha/hora exacta**, puertos seleccionados, número de hilos, duración total e inventario detallado de puertos abiertos. El archivo se sobrescribe al repetir el escaneo del mismo objetivo.
 
-> ⚠️ El reporte se **sobrescribe** si escaneas de nuevo el mismo objetivo; renómbralo para conservar evidencia histórica.
+### 7️⃣ 🔁 Resolución inversa de DNS (PTR)
+Tras resolver el dominio a IPv4, se consulta `gethostbyaddr()` para identificar el nombre PTR asociado a la IP. El valor se muestra en consola y se incluye en el reporte; si no existe un registro PTR, se indica expresamente. No constituye una verificación de propiedad del activo.
+
+### 8️⃣ ⏱️ Tiempo de respuesta por socket (RTT)
+Se mide en milisegundos el tiempo transcurrido alrededor de cada intento TCP con `connect_ex()`. El RTT se muestra y conserva en el informe para los **puertos abiertos**; los intentos cerrados o inalcanzables no se incluyen en el inventario de hallazgos. Es una medición de establecimiento de conexión, no una prueba continua de latencia.
+
+### 9️⃣ 🛡️ Inspección de cabeceras de seguridad web
+En puertos web seleccionados (`80`, `443`, `8080`, `8443`, `3000`, `5000`), se solicita la página raíz y se inspeccionan `Strict-Transport-Security` (HSTS), `X-Frame-Options`, `Content-Security-Policy` y `X-Powered-By`; también se registra la cabecera `Server`. Una cabecera ausente o no declarada no demuestra por sí sola que exista una vulnerabilidad.
+
+> ⚠️ La inspección envía HTTP sin negociar TLS. Los servicios exclusivamente HTTPS pueden devolver datos incompletos o no disponibles; verifícalos con una evaluación web compatible con TLS.
+
+### 🔟 📊 Matriz de riesgo y CVSS estimado
+Los puertos conocidos se asocian a un perfil de servicio, una de cuatro categorías de severidad (bajo, medio, alto o crítico; la CLI las muestra como `BAJO`, `MEDIO`, `ALTO` o `CRÍTICO`) y una **puntuación base CVSS estimada**. Los puertos sin perfil se marcan `INFORMATIVO` con puntuación `0.0`.
+
+> ℹ️ Son estimaciones heurísticas por puerto, no evaluaciones CVSS de vulnerabilidades confirmadas, coincidencias CVE ni mediciones de explotabilidad. Valida cada hallazgo antes de decidir su riesgo.
+
+### 1️⃣1️⃣ 🧾 Informes forenses industriales y guía de hardening
+El informe generado reúne el resumen del análisis, identidad del objetivo y PTR, alcance y tiempos del escaneo, inventario de puertos/servicios abiertos, RTT y métricas de riesgo, observaciones de cabeceras web disponibles y una sección de remediación y hardening. Incluye recomendaciones sobre protocolos inseguros, cabeceras web defensivas y segmentación de servicios sensibles.
 
 <a id="es-requirements"></a>
 
@@ -346,7 +385,7 @@ Cada ejecución genera `reporte_<objetivo>.txt` (puntos reemplazados por `_`) co
 python --version        # en Linux/macOS: python3 --version
 
 # 2️⃣ Clona el repositorio
-git clone https://github.com/<TU-USUARIO>/py-net-recon.git
+git clone https://github.com/francisc0-PE/py-net-recon.git
 cd py-net-recon
 
 # 3️⃣ Comprueba que funciona
@@ -362,8 +401,8 @@ python scanner.py --help
 | Flag | Largo | Obligatorio | Descripción | Por defecto |
 |:---:|---|:---:|---|---|
 | `-t` | `--target` | ✅ | IP o dominio objetivo | — |
-| `-p` | `--ports` | ❌ | Rango (`1-1024`) o lista (`80,443`) | `21,22,80,443,445,8080` |
-| `-w` | `--workers` | ❌ | Hilos simultáneos | `50` |
+| `-p` | `--ports` | ❌ | Rango (`1-1024`) o lista (`80,443`) | `21,22,80,443,445,3306,8080` |
+| `-w` | `--workers` | ❌ | Hilos simultáneos | `100` |
 | `-h` | `--help` | ❌ | Muestra la ayuda | — |
 
 ```bash
@@ -386,14 +425,14 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
 📺 **Ejemplo de salida** (ilustrativo):
 
 ```text
-=== PY-NET-RECON v1.2 | Dynamic Motor ===
+=== PY-NET-RECON v2.3 | Ultimate Threat Intelligence & Forensic Recon Engine ===
 
-[*] Iniciando escaneo en scanme.nmap.org (45.33.32.156) | Puertos a evaluar: 1024 | Hilos: 50
-[+] Puerto 22 ABIERTO | Servicio: SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13
-[+] Puerto 80 ABIERTO | Servicio: HTTP/1.1 200 OK
+[*] Objetivo: scanme.nmap.org | IP: 45.33.32.156 | PTR: scanme.nmap.org
+[*] Iniciando motor multihilo con 7 puertos y 100 workers...
+[+] Puerto    22 ABIERTO | RTT: 12.34ms | Servicio: SSH (Secure Shell) | CVSS: 5.3 | Riesgo: [MEDIO]
 
-[*] Escaneo finalizado en 6.42 segundos.
-[+] Reporte guardado exitosamente en: reporte_scanme_nmap_org.txt
+[*] Auditoría integral finalizada en 0.42 segundos.
+[+] Reporte Forense Enterprise generado con éxito: reporte_forense_scanme_nmap_org.txt
 ```
 
 > 🧪 Practica legalmente con `scanme.nmap.org` (permitido por el proyecto Nmap, uso moderado) o con tu propio laboratorio.
@@ -409,26 +448,27 @@ Todo vive en [scanner.py](scanner.py), organizado en **funciones pequeñas de re
  CLI (argparse)
      │   -t objetivo   -p puertos   -w hilos
      ▼
- gethostbyname()  ──► IP del objetivo
+ gethostbyname()  ──► IP del objetivo ──► gethostbyaddr() ──► PTR
      ▼
  parse_ports()    ──► [21, 22, 80, ...]
      ▼
  ThreadPoolExecutor (N hilos)
      ├─► scan_port(ip, 21)  ┐
-     ├─► scan_port(ip, 22)  ├─ connect_ex == 0 ? ─► get_banner() ─► "[+] Puerto ..."
-     └─► scan_port(ip, ...) ┘                                       (o None si cerrado)
+     ├─► scan_port(ip, 80)  ├─ connect_ex + RTT ─► perfil de riesgo / inspección web
+     └─► scan_port(ip, ...) ┘
      ▼
  future.result() ──► lista de puertos abiertos
      ▼
- Reporte reporte_<objetivo>.txt
+ reporte_forense_<objetivo>.txt ──► inventario + riesgo + remediación
 ```
 
 | Función | Rol | Detalle técnico |
 |---|---|---|
 | `parse_ports()` | 🎛️ Motor de puertos | Texto → `list[int]`; *fallback* seguro a 80, 443 |
-| `get_banner()` | 🏷️ Fingerprinting | Nueva conexión, `HEAD` para HTTP, `recv(1024)`, primera línea |
-| `scan_port()` | 🔌 Unidad de trabajo | `connect_ex`; imprime y devuelve solo si está abierto |
-| `main()` | 🎼 Orquestador | CLI, DNS, pool de hilos, cronómetro y reporte |
+| `get_risk_profile()` | 📊 Matriz de riesgo | Servicio, nivel y perfil CVSS estimado por puerto conocido |
+| `deep_http_inspection()` | 🛡️ Inspección web | Lee cabeceras HTTP seleccionadas y datos del servidor |
+| `scan_port()` | 🔌 Unidad de trabajo | Conexión TCP, medición RTT, riesgo/banner e inspección web opcional |
+| `main()` | 🎼 Orquestador | CLI, DNS directo/inverso, pool de hilos, salida e informe forense |
 
 ### 🧵 ¿Cómo fluyen los hilos?
 1. `main()` crea el *pool* con `max_workers = -w`.
@@ -440,8 +480,8 @@ Todo vive en [scanner.py](scanner.py), organizado en **funciones pequeñas de re
 ### 🎓 Qué aprenderás
 Sockets TCP y el *three-way handshake* implícito en `connect_ex`; concurrencia en tareas I/O-bound; gestión segura de recursos con *context managers*; diseño de CLIs con `argparse` y tolerancia a entradas inválidas.
 
-### 🔭 Limitaciones y hoja de ruta
-Solo TCP/IPv4 · escaneo *connect* completo (visible en logs, sin SYN scan) · sin TLS en el *banner grabbing* (p. ej. puerto 443) · ideas futuras: salida JSON/CSV, nombre de reporte configurable, *timeouts* por CLI, barra de progreso y soporte TLS.
+### 🔭 Limitaciones conocidas
+Solo escaneo TCP/IPv4 de tipo *connect* · RTT incluido en los resultados de puertos abiertos · CVSS heurístico por perfil de puerto, sin validar vulnerabilidades · inspección web HTTP sin negociación TLS · informes de texto que se sobrescriben al repetir el objetivo · sin pruebas autenticadas, explotación ni correlación con CVE.
 
 <a id="es-disclaimer"></a>
 
@@ -499,10 +539,12 @@ Toute intrusion autorisée débute par la **reconnaissance et l'énumération**.
 
 | ❓ Question | 🛠️ Réponse apportée par py-net-recon |
 |---|---|
-| Quelle est la cible et son adresse IP ? | Résolution DNS du nom d'hôte |
+| Quelle est la cible et son adresse IP ? | DNS direct et inverse (PTR) |
 | Quelles portes sont ouvertes ? | Scan TCP de type *connect* |
-| Quel logiciel se trouve derrière ? | *Banner grabbing* (collecte de bannières) |
-| Comment conserver une preuve ? | Rapport `.txt` horodaté |
+| Quelle est la réactivité de chaque port ouvert ? | RTT TCP en millisecondes |
+| Quelles défenses web sont visibles ? | Inspection des en-têtes HTTP |
+| Comment hiérarchiser les constats ? | CVSS estimé et niveau de risque |
+| Comment conserver les éléments probants ? | Rapport forensique `.txt` structuré |
 
 > 💡 **Surface d'attaque** = ensemble des points d'entrée exposés. On ne peut ni défendre ni auditer ce que l'on ne connaît pas.
 
@@ -512,7 +554,7 @@ Toute intrusion autorisée débute par la **reconnaissance et l'énumération**.
 
 ### 1️⃣ 🔌 Scan TCP via sockets et fermeture propre des connexions
 Utilise `socket` avec `AF_INET` + `SOCK_STREAM` (TCP/IPv4) et `connect_ex()`, qui **renvoie un code d'erreur au lieu de lever une exception** : `0` signifie que le **port est ouvert**.
-- ⏱️ *Timeout* de **1,0 s** par port : les ports filtrés ne bloquent jamais l'analyse.
+- ⏱️ Délai de connexion de **1,2 s** par port : les ports filtrés ne bloquent pas le scan indéfiniment.
 - 🧹 `with socket.socket(...)` **ferme systématiquement la connexion**, même en cas d'erreur, ce qui évite toute fuite de descripteurs.
 
 ### 2️⃣ ⚡ Multithreading massif avec `ThreadPoolExecutor`
@@ -527,7 +569,7 @@ Lorsqu'un port est ouvert, une nouvelle connexion est établie et la première r
 | Port | Service type | Technique |
 |:---:|---|---|
 | **22** | SSH | Le serveur s'annonce : `SSH-2.0-OpenSSH_8.9...` |
-| **80 / 8080** | HTTP | Envoi de `HEAD / HTTP/1.1` + `Host`, lecture de la ligne d'état |
+| **80 / 8080** | HTTP | Envoi de `GET / HTTP/1.1` + `Host` pour inspecter le service web |
 | **21 / autres** | FTP, etc. | Lecture du message d'accueil |
 
 Seule la **première ligne** est conservée, décodée avec `errors='ignore'`. Sans réponse : `Sin banner visible` (aucune bannière visible).
@@ -547,9 +589,26 @@ Aide automatique (`-h`), arguments obligatoires et valeurs typées (`-w` est un 
 Une saisie invalide ne provoque jamais de plantage : l'outil avertit l'utilisateur et applique `80, 443` par défaut.
 
 ### 6️⃣ 🗂️ Rapports forensiques `.txt` automatiques et horodatés
-Chaque exécution produit `reporte_<cible>.txt` (points remplacés par `_`) contenant la cible, l'IP résolue, la **date et l'heure exactes**, les ports et threads utilisés, une ligne par port ouvert et la durée totale.
+Chaque exécution produit `reporte_forense_<cible>.txt` (points remplacés par `_`) avec la cible, l'adresse IP résolue, l'**horodatage précis**, les ports sélectionnés, le nombre de threads, la durée totale et l'inventaire détaillé des ports ouverts. Le fichier est écrasé lors d'un nouveau scan de la même cible.
 
-> ⚠️ Le rapport est **écrasé** lors d'un nouveau scan de la même cible ; pensez à le renommer pour conserver un historique probant.
+### 7️⃣ 🔁 Résolution DNS inverse (PTR)
+Après la résolution du nom d'hôte en IPv4, `gethostbyaddr()` recherche le nom PTR associé à l'adresse IP. Le résultat apparaît dans la console et le rapport ; en l'absence d'enregistrement PTR, cette indisponibilité est signalée. Cette donnée ne prouve pas la propriété de l'actif.
+
+### 8️⃣ ⏱️ Temps de réponse socket par port (RTT)
+Le temps écoulé autour de chaque tentative TCP `connect_ex()` est mesuré en millisecondes. Le RTT est affiché et conservé dans le rapport pour les **ports ouverts** ; les tentatives fermées ou injoignables ne figurent pas dans l'inventaire des constats. Il s'agit du temps d'établissement de la connexion, et non d'une mesure continue de latence.
+
+### 9️⃣ 🛡️ Inspection des en-têtes de sécurité web
+Sur certains ports web (`80`, `443`, `8080`, `8443`, `3000`, `5000`), l'outil demande la page racine et examine `Strict-Transport-Security` (HSTS), `X-Frame-Options`, `Content-Security-Policy` et `X-Powered-By`; l'en-tête `Server` est également relevé. L'absence ou la non-déclaration d'un en-tête ne prouve pas à elle seule une vulnérabilité.
+
+> ⚠️ L'inspection envoie une requête HTTP sans négociation TLS. Les services HTTPS uniquement peuvent fournir des données incomplètes ou indisponibles ; vérifiez-les avec un audit web compatible TLS.
+
+### 🔟 📊 Matrice de risque et CVSS estimé
+Les ports connus sont associés à un profil de service, à l'une des quatre catégories de gravité (faible, moyen, élevé ou critique ; libellées dans la CLI `BAJO`, `MEDIO`, `ALTO` ou `CRÍTICO`) et à un **score de base CVSS estimé**. Les ports sans profil portent le libellé `INFORMATIVO` et le score `0.0`.
+
+> ℹ️ Il s'agit d'estimations heuristiques au niveau du port, et non d'évaluations CVSS de vulnérabilités confirmées, de correspondances CVE ou de mesures d'exploitabilité. Chaque constat doit être validé dans son contexte.
+
+### 1️⃣1️⃣ 🧾 Rapports forensiques industriels et recommandations de durcissement
+Le rapport rassemble un résumé de l'analyse, l'identité de la cible et le PTR, le périmètre et les temps du scan, l'inventaire des ports/services ouverts, les RTT et métriques de risque, les observations disponibles sur les en-têtes web, ainsi qu'une section de remédiation et de durcissement. Les recommandations portent sur les protocoles non sécurisés, les en-têtes défensifs et la segmentation des services sensibles.
 
 <a id="fr-requirements"></a>
 
@@ -572,7 +631,7 @@ Chaque exécution produit `reporte_<cible>.txt` (points remplacés par `_`) cont
 python --version        # sous Linux/macOS : python3 --version
 
 # 2️⃣ Cloner le dépôt
-git clone https://github.com/<VOTRE-UTILISATEUR>/py-net-recon.git
+git clone https://github.com/francisc0-PE/py-net-recon.git
 cd py-net-recon
 
 # 3️⃣ Vérifier le bon fonctionnement
@@ -588,8 +647,8 @@ python scanner.py --help
 | Option | Forme longue | Obligatoire | Description | Valeur par défaut |
 |:---:|---|:---:|---|---|
 | `-t` | `--target` | ✅ | Adresse IP ou nom de domaine de la cible | — |
-| `-p` | `--ports` | ❌ | Plage (`1-1024`) ou liste (`80,443`) | `21,22,80,443,445,8080` |
-| `-w` | `--workers` | ❌ | Nombre de threads simultanés | `50` |
+| `-p` | `--ports` | ❌ | Plage (`1-1024`) ou liste (`80,443`) | `21,22,80,443,445,3306,8080` |
+| `-w` | `--workers` | ❌ | Nombre de threads simultanés | `100` |
 | `-h` | `--help` | ❌ | Affiche l'aide | — |
 
 ```bash
@@ -612,14 +671,14 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
 📺 **Exemple de sortie** (à titre illustratif) :
 
 ```text
-=== PY-NET-RECON v1.2 | Dynamic Motor ===
+=== PY-NET-RECON v2.3 | Ultimate Threat Intelligence & Forensic Recon Engine ===
 
-[*] Iniciando escaneo en scanme.nmap.org (45.33.32.156) | Puertos a evaluar: 1024 | Hilos: 50
-[+] Puerto 22 ABIERTO | Servicio: SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13
-[+] Puerto 80 ABIERTO | Servicio: HTTP/1.1 200 OK
+[*] Objetivo: scanme.nmap.org | IP: 45.33.32.156 | PTR: scanme.nmap.org
+[*] Iniciando motor multihilo con 7 puertos y 100 workers...
+[+] Puerto    22 ABIERTO | RTT: 12.34ms | Servicio: SSH (Secure Shell) | CVSS: 5.3 | Riesgo: [MEDIO]
 
-[*] Escaneo finalizado en 6.42 segundos.
-[+] Reporte guardado exitosamente en: reporte_scanme_nmap_org.txt
+[*] Auditoría integral finalizada en 0.42 segundos.
+[+] Reporte Forense Enterprise generado con éxito: reporte_forense_scanme_nmap_org.txt
 ```
 
 > ℹ️ Les messages affichés par l'outil sont actuellement rédigés en espagnol.
@@ -636,26 +695,27 @@ L'ensemble du code se trouve dans [scanner.py](scanner.py), structuré en **peti
  CLI (argparse)
      │   -t cible   -p ports   -w threads
      ▼
- gethostbyname()  ──► IP de la cible
+ gethostbyname()  ──► IPv4 de la cible ──► gethostbyaddr() ──► PTR
      ▼
  parse_ports()    ──► [21, 22, 80, ...]
      ▼
  ThreadPoolExecutor (N threads)
      ├─► scan_port(ip, 21)  ┐
-     ├─► scan_port(ip, 22)  ├─ connect_ex == 0 ? ─► get_banner() ─► "[+] Port ..."
-     └─► scan_port(ip, ...) ┘                                       (ou None si fermé)
+     ├─► scan_port(ip, 80)  ├─ connect_ex + RTT ─► profil de risque / inspection web
+     └─► scan_port(ip, ...) ┘
      ▼
  future.result() ──► liste des ports ouverts
      ▼
- Rapport reporte_<cible>.txt
+ reporte_forense_<cible>.txt ──► inventaire + risque + remédiation
 ```
 
 | Fonction | Rôle | Détail technique |
 |---|---|---|
 | `parse_ports()` | 🎛️ Moteur de ports | Texte → `list[int]` ; repli sécurisé sur 80, 443 |
-| `get_banner()` | 🏷️ Fingerprinting | Nouvelle connexion, `HEAD` pour HTTP, `recv(1024)`, première ligne |
-| `scan_port()` | 🔌 Unité de travail | `connect_ex` ; affiche et retourne uniquement si le port est ouvert |
-| `main()` | 🎼 Orchestrateur | CLI, DNS, pool de threads, chronométrage et rapport |
+| `get_risk_profile()` | 📊 Cartographie des risques | Service, niveau et profil CVSS estimé du port connu |
+| `deep_http_inspection()` | 🛡️ Inspection web | Lecture des en-têtes HTTP sélectionnés et des métadonnées serveur |
+| `scan_port()` | 🔌 Unité de travail | Connexion TCP, mesure RTT, risque/bannière et inspection web éventuelle |
+| `main()` | 🎼 Orchestrateur | CLI, DNS direct/inverse, pool de threads, sortie et rapport forensique |
 
 ### 🧵 Comment circulent les threads ?
 1. `main()` crée le pool avec `max_workers = -w`.
@@ -667,8 +727,8 @@ L'ensemble du code se trouve dans [scanner.py](scanner.py), structuré en **peti
 ### 🎓 Ce que vous apprendrez
 Les sockets TCP et la poignée de main en trois temps (*three-way handshake*) implicite dans `connect_ex` ; la concurrence pour les tâches liées aux E/S ; la gestion sûre des ressources via les gestionnaires de contexte ; la conception d'une CLI avec `argparse` et la tolérance aux saisies erronées.
 
-### 🔭 Limites connues et feuille de route
-TCP/IPv4 uniquement · scan *connect* complet (visible dans les journaux, pas de SYN scan) · pas de TLS pour la collecte de bannières (p. ex. port 443) · évolutions envisagées : export JSON/CSV, nom de rapport paramétrable, *timeouts* via la CLI, barre de progression et prise en charge de TLS.
+### 🔭 Limites connues
+Scan TCP/IPv4 de type *connect* uniquement · RTT consigné pour les ports ouverts · CVSS heuristique fondé sur un profil de port, sans validation de vulnérabilité · inspection web en HTTP sans négociation TLS · rapports texte écrasés lors d'un nouveau scan de la même cible · aucun test authentifié, aucune validation d'exploitation ni corrélation CVE.
 
 <a id="fr-disclaimer"></a>
 
@@ -724,10 +784,12 @@ Cet outil est fourni **exclusivement** pour :
 
 | ❓ 问题 | 🛠️ py-net-recon 的解决方式 |
 |---|---|
-| 目标是谁？IP 是多少？ | 对域名进行 DNS 解析 |
+| 目标是谁？IP 是多少？ | 正向与反向 DNS（PTR）解析 |
 | 哪些"大门"是开着的？ | TCP *connect* 扫描 |
-| 背后运行的是什么软件？ | Banner 抓取（Banner Grabbing） |
-| 如何留存证据？ | 带时间戳的 `.txt` 报告 |
+| 每个开放端口的响应速度如何？ | 毫秒级 TCP Socket RTT |
+| 可以观察到哪些 Web 防御？ | HTTP 安全响应头检查 |
+| 如何确定发现项的优先级？ | 估算 CVSS 分数与风险等级 |
+| 如何留存证据？ | 结构化 `.txt` 取证报告 |
 
 > 💡 **攻击面** = 所有暴露在外的入口点。你看不到的东西，就无法防御（也无法审计）。
 
@@ -742,7 +804,7 @@ Cet outil est fourni **exclusivement** pour :
 
 ### 2️⃣ ⚡ 使用 `ThreadPoolExecutor` 实现大规模多线程
 端口扫描是**I/O 密集型**任务：程序大部分时间都在*等待*网络响应。线程池可以**同时**等待数十个连接。
-- 🧵 并发数可配置（`-w`，默认 50）。
+- 🧵 并发数可配置（`-w`，默认 100）。
 - 📈 扫描 1-1024 端口的耗时从数分钟（串行）缩短到数秒。
 - 🔒 `with ThreadPoolExecutor` 代码块确保所有线程都会结束并被释放。
 
@@ -752,7 +814,7 @@ Cet outil est fourni **exclusivement** pour :
 | 端口 | 典型服务 | 技术手段 |
 |:---:|---|---|
 | **22** | SSH | 服务器主动声明：`SSH-2.0-OpenSSH_8.9...` |
-| **80 / 8080** | HTTP | 发送 `HEAD / HTTP/1.1` + `Host`，读取状态行 |
+| **80 / 8080** | HTTP | 发送 `GET / HTTP/1.1` + `Host` 以检查 Web 服务 |
 | **21 / 其他** | FTP 等 | 读取欢迎信息 |
 
 仅保留**第一行**，并以 `errors='ignore'` 解码。无响应时显示 `Sin banner visible`（无可见 Banner）。
@@ -772,9 +834,26 @@ Cet outil est fourni **exclusivement** pour :
 输入格式无效时工具不会崩溃：它会给出提示并默认使用 `80, 443`。
 
 ### 6️⃣ 🗂️ 自动生成带时间戳的 `.txt` 取证报告
-每次运行都会生成 `reporte_<目标>.txt`（点号替换为 `_`），内容包括：目标、解析后的 IP、**精确日期时间**、所用端口与线程数、每个开放端口一行记录，以及总耗时。
+每次运行都会生成 `reporte_forense_<目标>.txt`（点号替换为 `_`），包含目标、解析后的 IP、**精确分析时间**、所选端口、线程数、总耗时和开放端口的详细清单。对同一目标再次扫描会覆盖该文件。
 
-> ⚠️ 对同一目标再次扫描时，报告会被**覆盖**；如需保留历史证据，请先重命名。
+### 7️⃣ 🔁 DNS 反向解析（PTR）
+将主机名解析为 IPv4 后，工具调用 `gethostbyaddr()` 查询与该 IP 关联的 PTR 名称。结果会显示在终端并写入报告；没有 PTR 记录时会明确标记。PTR 信息本身不能证明资产归属。
+
+### 8️⃣ ⏱️ 按端口测量 Socket 响应时间（RTT）
+工具测量每次 TCP `connect_ex()` 尝试所耗费的时间，并以毫秒表示。**开放端口**的 RTT 会显示并保存在报告中；关闭或无法连接的尝试不会列入发现项清单。这是连接建立耗时，不是持续性网络延迟测试。
+
+### 9️⃣ 🛡️ Web 安全响应头检查
+对于选定的 Web 端口（`80`、`443`、`8080`、`8443`、`3000`、`5000`），工具请求根路径并检查 `Strict-Transport-Security`（HSTS）、`X-Frame-Options`、`Content-Security-Policy` 和 `X-Powered-By`，同时记录 `Server` 响应头。响应头缺失或未披露本身并不证明存在漏洞。
+
+> ⚠️ 检查使用普通 HTTP，不会进行 TLS 协商。因此，仅支持 HTTPS 的服务可能返回不完整或不可用的数据；请使用支持 TLS 的 Web 评估工具进行验证。
+
+### 🔟 📊 风险矩阵与估算 CVSS
+已知端口会关联服务档案、四种严重程度之一（低、中、高、严重；CLI 标签为 `BAJO`、`MEDIO`、`ALTO` 或 `CRÍTICO`）和**估算的 CVSS 基础分数**。未配置档案的端口标记为 `INFORMATIVO`，分数为 `0.0`。
+
+> ℹ️ 这些是基于端口的启发式估值，并非对已确认漏洞的 CVSS 评估、CVE 匹配或可利用性验证。应结合环境验证发现项后再做风险决策。
+
+### 1️⃣1️⃣ 🧾 企业级取证报告与加固建议
+报告包含分析摘要、目标与 PTR 身份、扫描范围和耗时、开放端口/服务清单、RTT 与风险指标、可获取的 Web 响应头观察结果，以及修复与加固章节。建议涵盖不安全协议、Web 防御响应头和敏感服务的网络分段。
 
 <a id="zh-requirements"></a>
 
@@ -797,7 +876,7 @@ Cet outil est fourni **exclusivement** pour :
 python --version        # Linux/macOS 请使用：python3 --version
 
 # 2️⃣ 克隆仓库
-git clone https://github.com/<你的用户名>/py-net-recon.git
+git clone https://github.com/francisc0-PE/py-net-recon.git
 cd py-net-recon
 
 # 3️⃣ 验证是否可用
@@ -813,8 +892,8 @@ python scanner.py --help
 | 参数 | 完整形式 | 必填 | 说明 | 默认值 |
 |:---:|---|:---:|---|---|
 | `-t` | `--target` | ✅ | 目标 IP 或域名 | — |
-| `-p` | `--ports` | ❌ | 范围（`1-1024`）或列表（`80,443`） | `21,22,80,443,445,8080` |
-| `-w` | `--workers` | ❌ | 并发线程数 | `50` |
+| `-p` | `--ports` | ❌ | 范围（`1-1024`）或列表（`80,443`） | `21,22,80,443,445,3306,8080` |
+| `-w` | `--workers` | ❌ | 并发线程数 | `100` |
 | `-h` | `--help` | ❌ | 显示帮助 | — |
 
 ```bash
@@ -837,17 +916,17 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
 📺 **输出示例**（仅作演示）：
 
 ```text
-=== PY-NET-RECON v1.2 | Dynamic Motor ===
+=== PY-NET-RECON v2.3 | Ultimate Threat Intelligence & Forensic Recon Engine ===
 
-[*] Iniciando escaneo en scanme.nmap.org (45.33.32.156) | Puertos a evaluar: 1024 | Hilos: 50
-[+] Puerto 22 ABIERTO | Servicio: SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13
-[+] Puerto 80 ABIERTO | Servicio: HTTP/1.1 200 OK
+[*] Objetivo: scanme.nmap.org | IP: 45.33.32.156 | PTR: scanme.nmap.org
+[*] Iniciando motor multihilo con 7 puertos y 100 workers...
+[+] Puerto    22 ABIERTO | RTT: 12.34ms | Servicio: SSH (Secure Shell) | CVSS: 5.3 | Riesgo: [MEDIO]
 
-[*] Escaneo finalizado en 6.42 segundos.
-[+] Reporte guardado exitosamente en: reporte_scanme_nmap_org.txt
+[*] Auditoría integral finalizada en 0.42 segundos.
+[+] Reporte Forense Enterprise generado con éxito: reporte_forense_scanme_nmap_org.txt
 ```
 
-> ℹ️ 工具当前输出的提示信息为西班牙语。
+> ℹ️ CLI 输出及风险标签目前为西班牙语；上方示例展示了 v2.3 的 RTT、CVSS 和 PTR 字段。
 > 🧪 请在合法范围内练习：使用 `scanme.nmap.org`（Nmap 项目允许，请适度使用）或你自己的实验环境。
 > ⚙️ 线程越多速度越快，但网络噪声也越大，并有可能占满带宽或触发 IDS/防火墙。
 
@@ -861,26 +940,27 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
  CLI (argparse)
      │   -t 目标   -p 端口   -w 线程数
      ▼
- gethostbyname()  ──► 目标 IP
+ gethostbyname()  ──► 目标 IPv4 ──► gethostbyaddr() ──► PTR
      ▼
  parse_ports()    ──► [21, 22, 80, ...]
      ▼
  ThreadPoolExecutor（N 个线程）
      ├─► scan_port(ip, 21)  ┐
-     ├─► scan_port(ip, 22)  ├─ connect_ex == 0 ? ─► get_banner() ─► "[+] 端口 ..."
-     └─► scan_port(ip, ...) ┘                                       （关闭则返回 None）
+     ├─► scan_port(ip, 80)  ├─ connect_ex + RTT ─► 风险档案 / Web 检查
+     └─► scan_port(ip, ...) ┘
      ▼
  future.result() ──► 开放端口结果列表
      ▼
- 报告 reporte_<目标>.txt
+ reporte_forense_<目标>.txt ──► 清单 + 风险 + 修复建议
 ```
 
 | 函数 | 作用 | 技术细节 |
 |---|---|---|
 | `parse_ports()` | 🎛️ 端口引擎 | 文本 → `list[int]`；安全回退到 80、443 |
-| `get_banner()` | 🏷️ 指纹识别 | 新建连接，HTTP 发送 `HEAD`，`recv(1024)`，取第一行 |
-| `scan_port()` | 🔌 工作单元 | `connect_ex`；仅在端口开放时打印并返回 |
-| `main()` | 🎼 调度中枢 | CLI、DNS、线程池、计时与报告 |
+| `get_risk_profile()` | 📊 风险映射 | 已知端口的服务、等级与估算 CVSS 档案 |
+| `deep_http_inspection()` | 🛡️ Web 检查 | 读取指定 HTTP 响应头和服务器信息 |
+| `scan_port()` | 🔌 工作单元 | TCP 连接、RTT 测量、Banner/风险及可选 Web 检查 |
+| `main()` | 🎼 调度中枢 | CLI、正向/反向 DNS、线程池、输出与取证报告 |
 
 ### 🧵 线程是如何流转的？
 1. `main()` 以 `max_workers = -w` 创建线程池。
@@ -892,8 +972,8 @@ python scanner.py -t scanme.nmap.org -p 1-5000 -w 200
 ### 🎓 你将学到什么
 TCP Socket，以及 `connect_ex` 中隐含的三次握手；I/O 密集型任务的并发；用上下文管理器安全管理资源；用 `argparse` 设计 CLI 并容错处理错误输入。
 
-### 🔭 已知限制与路线图
-仅支持 TCP/IPv4 · 完整 *connect* 扫描（会留在日志中，不含 SYN 扫描）· Banner 抓取不支持 TLS（如 443 端口）· 未来计划：JSON/CSV 输出、可配置报告名、命令行设置超时、进度条、TLS 支持。
+### 🔭 已知限制
+仅支持 TCP/IPv4 *connect* 扫描 · RTT 仅保存在开放端口结果中 · CVSS 是端口档案启发式估值，不验证漏洞 · Web 检查使用 HTTP 且不协商 TLS · 同一目标的纯文本报告会被覆盖 · 不包含认证测试、漏洞利用验证或 CVE 关联。
 
 <a id="zh-disclaimer"></a>
 

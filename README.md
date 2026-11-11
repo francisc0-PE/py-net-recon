@@ -1,3 +1,5 @@
+<a id="top"></a>
+
 <div align="center">
 
 # 🛰️🔍 PY-NET-RECON 🔍🛰️
@@ -29,7 +31,7 @@
 
 # 🇬🇧 ENGLISH
 
-[🏠 Top](#-py-net-recon-) · [🇪🇸 ES](#es) · [🇫🇷 FR](#fr) · [🇨🇳 中文](#zh)
+[🏠 Top](#top) · [🇪🇸 ES](#es) · [🇫🇷 FR](#fr) · [🇨🇳 中文](#zh)
 
 </div>
 
@@ -240,7 +242,7 @@ This tool is provided **exclusively** for:
 
 <div align="right">
 
-[⬆️ Back to top](#-py-net-recon-)
+[⬆️ Back to top](#top)
 
 </div>
 
@@ -253,7 +255,7 @@ This tool is provided **exclusively** for:
 
 # 🇪🇸 ESPAÑOL
 
-[🏠 Inicio](#-py-net-recon-) · [🇬🇧 EN](#en) · [🇫🇷 FR](#fr) · [🇨🇳 中文](#zh)
+[🏠 Inicio](#top) · [🇬🇧 EN](#en) · [🇫🇷 FR](#fr) · [🇨🇳 中文](#zh)
 
 </div>
 
@@ -464,7 +466,7 @@ Esta herramienta se ofrece **únicamente** para:
 
 <div align="right">
 
-[⬆️ Volver arriba](#-py-net-recon-)
+[⬆️ Volver arriba](#top)
 
 </div>
 
@@ -479,7 +481,7 @@ Esta herramienta se ofrece **únicamente** para:
 
 *Rédigé dans un registre technique et formel, usuel en entreprise au Grand-Duché de Luxembourg.*
 
-[🏠 Accueil](#-py-net-recon-) · [🇬🇧 EN](#en) · [🇪🇸 ES](#es) · [🇨🇳 中文](#zh)
+[🏠 Accueil](#top) · [🇬🇧 EN](#en) · [🇪🇸 ES](#es) · [🇨🇳 中文](#zh)
 
 </div>
 
@@ -691,7 +693,7 @@ Cet outil est fourni **exclusivement** pour :
 
 <div align="right">
 
-[⬆️ Retour en haut](#-py-net-recon-)
+[⬆️ Retour en haut](#top)
 
 </div>
 
@@ -704,7 +706,7 @@ Cet outil est fourni **exclusivement** pour :
 
 # 🇨🇳 中文（简体）
 
-[🏠 返回顶部](#-py-net-recon-) · [🇬🇧 EN](#en) · [🇪🇸 ES](#es) · [🇫🇷 FR](#fr)
+[🏠 返回顶部](#top) · [🇬🇧 EN](#en) · [🇪🇸 ES](#es) · [🇫🇷 FR](#fr)
 
 </div>
 
@@ -916,7 +918,7 @@ TCP Socket，以及 `connect_ex` 中隐含的三次握手；I/O 密集型任务�
 
 <div align="right">
 
-[⬆️ 返回顶部](#-py-net-recon-)
+[⬆️ 返回顶部](#top)
 
 </div>
 

@@ -199,9 +199,9 @@ def main():
                 reporte.append(f"   - Servidor Web (Fingerprint): {d['server']}")
                 reporte.append(f"   - Cabecera Powered-By     : {d['powered_by']}")
                 reporte.append(f"   - Cabeceras de Seguridad  :")
-                    reporte.append(f"     * HSTS                  : {d['hsts']}")
-                    reporte.append(f"     * X-Frame-Options       : {d['x_frame']}")
-                    reporte.append(f"     * Content-Security-Pol. : {d['csp']}")
+                reporte.append(f"     * HSTS                  : {d['hsts']}")
+                reporte.append(f"     * X-Frame-Options       : {d['x_frame']}")
+                reporte.append(f"     * Content-Security-Pol. : {d['csp']}")
             if 'banner' in d:
                 reporte.append(f"   - Banner Crudo del Socket : {d['banner']}")
             reporte.append(f"   " + "-" * 70)
@@ -224,7 +224,7 @@ def main():
     with open(nombre_archivo, "w", encoding="utf-8") as f:
         f.write("\n".join(reporte))
     
-    print(f"{MAGENTA}[+] Reporte Forense Enterprise generado con éxito: {nombre_archivo}{RESET}")
+    print(f"{MAGENTA}[+] Reporte Enterprise de Inteligencia guardado con éxito: {nombre_archivo}{RESET}")
 
 if __name__ == "__main__":
     main()

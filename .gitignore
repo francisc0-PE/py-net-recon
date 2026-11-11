@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.sqlite
+
+# Reportes de escaneo generados automáticamente
+reporte_*.txt
+*.log
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+
+# Configuración del editor
+.vscode/
+.idea/

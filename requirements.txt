@@ -1,0 +1,3 @@
+# py-net-recon utiliza exclusivamente la librería estándar de Python (socket, argparse, concurrent.futures, datetime, time).
+# Cero dependencias externas requeridas para el funcionamiento base, garantizando máxima velocidad y portabilidad.
+# Este archivo se mantiene estructurado para futuras ampliaciones de la herramienta.
